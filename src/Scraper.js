@@ -176,7 +176,7 @@ export default class Scraper {
 		this._logger.log(`Archiving ${storyId}`);
 		// I realised that trying to take an existing archive and only fetch new data means that edits wouldn't be picked up, which is unacceptable, so yay
 		const imageUrls = new Set();
-		const story = [];
+		const storyChapterMap = {};
 		let chat = [];
 
 		let metaData;
@@ -213,7 +213,7 @@ export default class Scraper {
 					return this._api(`/api/anonkun/chapters/${storyId}/${startCt}/${ct}`);
 				}, 30);
 				for (const chapter of chapters) {
-					story.push(chapter);
+          storyChapterMap[chapter._id] = chapter;
 				}
 			} catch (err) {
 				await this.logFatQuest(storyId);
@@ -221,6 +221,10 @@ export default class Scraper {
 			}
 			startCt = ct;
 		}
+
+    const story = Object.values(storyChapterMap).sort((a, b) => {
+      return a.ct - b.ct;
+    })
 
 		await fs.outputJson(path.join(archivePath, `${storyId}.chapters.json`), story);
 		if (downloadImages) {
