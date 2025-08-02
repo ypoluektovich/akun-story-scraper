@@ -19,6 +19,10 @@ class AkunApiWrapperBase {
     throw "not implemented";
   }
 
+  getChatLatest(storyId) {
+    throw "not implemented";
+  }
+
   getThreading(storyId) {
     throw "not implemented";
   }
@@ -27,7 +31,7 @@ class AkunApiWrapperBase {
     throw "not implemented";
   }
 
-  getChatPage(storyId, cpr, firstCT, lastCT, page, retryAttempts) {
+  getChatPage(storyId, cpr, firstCT, lastCT, page, retryAttempts, threading) {
     throw "not implemented";
   }
 }
@@ -63,6 +67,10 @@ export class DefaultAkunApiWrapper extends AkunApiWrapperBase {
     );
   }
 
+  getChatLatest(storyId) {
+    return this._striver.handle(() => this._api(`/api/chat/${storyId}/latest`));
+  }
+
   getThreading(storyId) {
     return this._striver.handle(() => this._api(`/api/chat/${storyId}/threading`));
   }
@@ -71,15 +79,18 @@ export class DefaultAkunApiWrapper extends AkunApiWrapperBase {
     return this._striver.handle(() => this._api(`/api/chat/pages`, {'r': storyId}));
   }
 
-  getChatPage(storyId, cpr, firstCT, lastCT, page, retryAttempts) {
+  getChatPage(storyId, cpr, firstCT, lastCT, page, retryAttempts, threading) {
     const pagePostData = {
       r: storyId,
-      threading: 'threading',
+      // threading: threading ? 'threading' : undefined,
       cpr,
       firstCT,
       lastCT,
       page,
     };
+    if (threading) {
+      pagePostData['threading'] = 'threading';
+    }
     return this._striver.handle(
       () => this._api(`/api/chat/page`, pagePostData),
       retryAttempts
@@ -118,6 +129,18 @@ class RecordingAwareAkunApiWrapperBase extends AkunApiWrapperBase {
     return this._magic(
       this._actual.getStoryChapters,
       this._getStoryChaptersFileName,
+      ...args
+    );
+  }
+
+  _getChatLatestFileName(storyId) {
+    return path.join(this._recordingDirectory, storyId, 'chat-latest.json');
+  }
+
+  getChatLatest(...args) {
+    return this._magic(
+      this._actual.getChatLatest,
+      this._getChatLatestFileName,
       ...args
     );
   }

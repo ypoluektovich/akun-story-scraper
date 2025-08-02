@@ -10,6 +10,7 @@ import {DefaultAkunApiWrapper, ReplayingAkunApiWrapper, SavingAkunApiWrapper} fr
 
 const theCommand = command("incremental")
 	.option('-v, --verbose', 'Verbose (debug) output')
+	.option('--short-chat-pages', 'Use short pages for chat retrieval (takes longer but may catch more posts)')
 	.option('--record', 'Record successful API call results')
 	.option('--replay', 'Replay recorded API call results');
 
@@ -61,6 +62,7 @@ async function start() {
 			await scraper.archiveStory({
 				storyId: id,
 				chatMode,
+				longChatPages: !!!cli.options.shortChatPages,
 				user: author,
 				downloadImages,
 				saver: saver

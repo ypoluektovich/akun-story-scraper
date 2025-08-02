@@ -19,9 +19,6 @@ const SORT_MODES = Object.freeze({
 	HOT: 'hot'
 });
 
-// The number of posts Akun has per page of story chat
-const postsPerPage = 300;
-
 function interpretMetadata(raw, override) {
 	const interpreted = {
 		storyId: raw._id,
@@ -188,7 +185,7 @@ export default class Scraper {
 		}
 	}
 
-	async archiveStory({storyId, chatMode = 'fetch', user, downloadImages = true, saver}) {
+	async archiveStory({storyId, chatMode = 'fetch', longChatPages = true, user, downloadImages = true, saver}) {
 		saver = saver || new DefaultSaver({
 			workDir: this._settings.outputDirectory,
 		});
@@ -263,11 +260,18 @@ export default class Scraper {
 
 		let chat = [];
 		if (chatMode === 'fetch') {
-			this._logger.log(`Fetching chat log`);
+			this._logger.log(`Fetching chat log (long pages: ${longChatPages})`);
+
+			// The number of posts Akun has per page of story chat
+			const postsPerPage = longChatPages ? 300 : 30;
 
 			saver.initializeMissingChatTracker();
 
-			let pagePosts = await this._apiWrapper.getThreading(storyId);
+			let pagePosts = await (
+				longChatPages ?
+					this._apiWrapper.getThreading(storyId) :
+					this._apiWrapper.getChatLatest(storyId)
+			);
 
 			if (pagePosts.length) {
 				const totalChatStats = new ItemStats();
@@ -278,9 +282,9 @@ export default class Scraper {
 
 					const finalPageIndex = Math.ceil(totalPosts / postsPerPage);
 
-					let firstCT = undefined;
-					let lastCT = undefined;
-					let cpr = undefined;
+					let firstCT = longChatPages ? undefined : pagePosts[0]['ct'];
+					let lastCT = longChatPages ? undefined : pagePosts[pagePosts.length - 1]['ct'];
+					let cpr = longChatPages ? undefined : finalPageIndex;
 
 					const assimilateChatPage = (pageIndex) => {
 						const stats = saver.addChatPosts(pagePosts);
@@ -293,12 +297,21 @@ export default class Scraper {
 							cpr = pageIndex;
 						}
 					};
-					assimilateChatPage(1);
 
-					for (let pageIndex = 2; pageIndex <= finalPageIndex; pageIndex++) {
+					if (longChatPages) {
+						assimilateChatPage(1);
+					}
+					for (let pageIndex = longChatPages ? 2 : 1; pageIndex <= finalPageIndex; pageIndex++) {
 						try {
-							pagePosts = await this._apiWrapper
-								.getChatPage(storyId, cpr, firstCT, lastCT, pageIndex, retryAttempts);
+							pagePosts = await this._apiWrapper.getChatPage(
+								storyId,
+								cpr,
+								firstCT,
+								lastCT,
+								pageIndex,
+								retryAttempts,
+								longChatPages
+							);
 							assimilateChatPage(pageIndex);
 						} catch (err) {
 							this._logger.error(`Page ${pageIndex}/${finalPageIndex}: ${err}`);
@@ -321,7 +334,7 @@ export default class Scraper {
 
 			// Export chat after gathering it all so that interrupting the scraper doesn't result in quests having partially updated chunks of chat
 			this._logger.log(`Committing chat logs`);
-			chat = await saver.commitChat(postsPerPage * 1000);
+			chat = await saver.commitChat(300000);
 		} else if (chatMode === 'read') {
 			chat = saver.getChat();
 		}
