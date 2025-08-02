@@ -1,25 +1,8 @@
 import fs from 'fs-extra';
 import imageType from 'image-type';
 import path from 'path';
-import request from 'request';
 import sanitize from 'sanitize-filename';
-import {Transform} from 'stream';
-
-class ImageTypeIntercept extends Transform {
-	constructor(options) {
-		super(options);
-		this._firstChunkHandled = false;
-	}
-
-	_transform(chunk, encoding, callback) {
-		if (!this._firstChunkHandled) {
-			this._firstChunkHandled = true;
-			this.emit('imageType', imageType(chunk));
-		}
-		this.push(chunk);
-		callback();
-	}
-}
+import { Readable } from 'stream';
 
 export default async function downloadImage(imageUrl, dest) {
 	const url = new URL(imageUrl);
@@ -28,51 +11,37 @@ export default async function downloadImage(imageUrl, dest) {
 
 	await fs.ensureDir(path.join(dest, path.dirname(imagePath)));
 
-	await new Promise((res, rej) => {
-		try {
-			let receivedData = false;
-			const imageReadable = request(imageUrl);
-			const intercept = new ImageTypeIntercept();
-			imageReadable.on('data', () => {
-				receivedData = true;
-			});
-			imageReadable.on('close', () => {
-				if (!receivedData) {
-					intercept.removeAllListeners('imageType');
-					rej(`Response has no data for ${imageUrl}`);
-				}
-			});
-			imageReadable.pipe(intercept);
-			intercept.on('imageType', (type) => {
-				try {
-					if (type) {
-						const {ext} = type;
-						if (path.extname(imagePath) !== `.${ext}`) {
-							imagePath += `.${ext}`;
-						}
-					}
-					const fileWriteable = fs.createWriteStream(path.join(dest, imagePath), {encoding: null});
-					intercept.pipe(fileWriteable);
-					fileWriteable.once('close', () => {
-						res();
-					});
-					fileWriteable.once('error', (err) => {
-						rej(err);
-					});
-				} catch (err) {
-					rej(err);
-				}
-			});
-			imageReadable.once('error', (err) => {
-				rej(err);
-			});
-			intercept.once('error', (err) => {
-				rej(err);
-			});
-		} catch (err) {
-			rej(err);
+	const response = await fetch(url);
+	if (!response.ok) {
+		throw new Error(`Response status: ${response.status}`);
+	}
+
+	// read some data to determine image type and maybe adjust the file extension
+	const reader = response.body.getReader();
+	// todo: accumulate chunks until reaching imageType.minimumBytes
+	const { value: chunk, done } = await reader.read();
+	reader.releaseLock();
+	if (done) {
+		throw new Error(`Response has no data for ${imageUrl}`);
+	}
+	
+	const maybeImageType = imageType(chunk);
+	if (maybeImageType) {
+		const {ext} = maybeImageType;
+		if (path.extname(imagePath) !== `.${ext}`) {
+			imagePath += `.${ext}`;
 		}
-	});
+	}
+
+	const fileWriteable = fs.createWriteStream(path.join(dest, imagePath), {encoding: null});
+
+	// don't forget to write the data we used for image type detection
+	fileWriteable.write(chunk, null);
+
+	// adapt web stream to node stream for pumping data
+	Readable.fromWeb(response.body).pipe(fileWriteable);
+	// unfortunately, node streams aren't async-friendly, so we have to adapt
+	await new Promise((res, rej) => fileWriteable.on('finish', res).on('error', rej));
 
 	return imagePath;
 }
