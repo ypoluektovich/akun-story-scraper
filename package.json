@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test --experimental-test-module-mocks './src/**.test.*'",
     "start": "node src/index.js",
     "build": "node build/build.js"
   },
@@ -26,5 +26,8 @@
     "pretty-ms": "^4.0.0",
     "request": "^2.88.0",
     "sanitize-filename": "^1.6.1"
+  },
+  "devDependencies": {
+    "memfs": "^4.34.0"
   }
 }
