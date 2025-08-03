@@ -1,11 +1,11 @@
 {
   "name": "akun-story-scraper",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "A tool to archive all quests on Akun",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test --experimental-test-module-mocks \"./src/**/*.test.*\"",
     "start": "node src/index.js",
     "build": "node build/build.js"
   },
@@ -26,8 +26,10 @@
     "postcss": "^7.0.13",
     "precss": "^4.0.0",
     "pretty-ms": "^4.0.0",
-    "request": "^2.88.0",
     "sanitize-filename": "^1.6.1",
     "sprintf-js": "^1.0.3"
+  },
+  "devDependencies": {
+    "memfs": "^4.34.0"
   }
 }
