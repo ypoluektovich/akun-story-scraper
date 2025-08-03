@@ -4,11 +4,11 @@ import Scraper from './Scraper.js';
 import {readOrAskForCredentials} from "./credentials.js";
 import IncrementalSaver from "./IncrementalSaver.js";
 import StoryList from "./yamlStoryList.js";
-import clap from 'clap';
+import { command } from 'clap';
 import buildView from "./view/buildView.js";
 import {DefaultAkunApiWrapper, ReplayingAkunApiWrapper, SavingAkunApiWrapper} from "./apiwrapper/apiwrapper.js";
 
-const theCommand = clap.command("incremental")
+const theCommand = command("incremental")
 	.option('-v, --verbose', 'Verbose (debug) output')
 	.option('--record', 'Record successful API call results')
 	.option('--replay', 'Replay recorded API call results');
